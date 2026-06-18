@@ -38,6 +38,54 @@
     .badge-civilian { background: #a855f7; color: #fff; }
     .badge-spy { background: #e879f9; color: #000; }
     .badge-waiting { background: rgba(255,255,255,0.1); color: #9ca3af; }
+    .badge-offline { background: rgba(255,255,255,0.05); color: #666; }
+    
+    /* Loading Spinner */
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+    }
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(34, 211, 238, 0.3);
+      border-top-color: #22d3ee;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: #22d3ee; margin-top: 16px; font-size: 14px; }
+    
+    /* Word Card */
+    .word-card {
+      background: #111118;
+      border: 2px solid rgba(34, 211, 238, 0.5);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      margin: 20px 0;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .word-card:hover { box-shadow: 0 0 30px rgba(34, 211, 238, 0.3); }
+    .word-card.hidden-word { border-color: rgba(255,255,255,0.2); box-shadow: none; }
+    .word-hidden { font-size: 24px; color: #666; }
+    .countdown { text-align: center; color: #9ca3af; font-size: 14px; margin: 8px 0; }
+    
+    /* Role Display */
+    .role-display { text-align: center; margin-bottom: 16px; }
+    .role-badge {
+      display: inline-block;
+      padding: 8px 24px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .role-unknown { background: rgba(255,255,255,0.1); color: #9ca3af; }
+    .role-judge { background: rgba(34, 211, 238, 0.2); color: #22d3ee; border: 2px solid #22d3ee; }
     
     /* Modal Styles */
     #how-to-play-modal {
@@ -160,20 +208,70 @@
     <!-- Game Page -->
     <div id="game-page" class="page hidden">
       <div class="header"><h1>YOUR WORD</h1></div>
-      <div class="card">
-        <div class="word-display">
-          <p style="color:#e879f9;font-size:18px" id="game-role">CIVILIAN</p>
-          <h2 id="game-word">---</h2>
-          <p style="color:#9ca3af;margin-top:20px;font-size:14px">Remember your word and describe it!</p>
+      
+      <!-- Loading State -->
+      <div id="game-loading" class="card hidden">
+        <div class="loading-container">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">LOADING...</div>
         </div>
       </div>
-      <div class="card" id="judge-panel" style="display:none">
-        <h3 style="color:#22d3ee;margin-bottom:16px">👨‍⚖️ JUDGE PANEL - All Players' Words</h3>
-        <div id="judge-players"></div>
-        <button class="btn btn-primary" onclick="endGame()" style="margin-top:16px">🏁 END GAME (Start Next Round)</button>
-      </div>
-      <div class="card">
-        <button class="btn btn-secondary" onclick="showPage('room-page')">← BACK TO ROOM</button>
+      
+      <!-- Game Content -->
+      <div id="game-content">
+        <div class="card">
+          <!-- Role Display - Only Judge sees role, others see ??? -->
+          <div class="role-display">
+            <p style="color:#9ca3af;font-size:12px;margin-bottom:8px">YOUR ROLE</p>
+            <div id="role-container">
+              <span id="game-role" class="role-badge role-unknown">???</span>
+            </div>
+          </div>
+          
+          <!-- Judge View -->
+          <div id="judge-view" style="display:none;">
+            <div class="word-display">
+              <p style="color:#22d3ee;font-size:14px;margin-bottom:16px">YOU KNOW BOTH WORDS</p>
+              <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+                <div style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:16px;">
+                  <p style="color:#a855f7;font-size:12px;margin-bottom:4px">CIVILIAN WORD</p>
+                  <p id="judge-civilian-word" style="color:#fff;font-size:20px;font-weight:bold;">---</p>
+                </div>
+                <div style="background:rgba(232,121,249,0.1);border:1px solid rgba(232,121,249,0.3);border-radius:12px;padding:16px;">
+                  <p style="color:#e879f9;font-size:12px;margin-bottom:4px">SPY WORD</p>
+                  <p id="judge-spy-word" style="color:#fff;font-size:20px;font-weight:bold;">---</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Player View -->
+          <div id="player-view">
+            <div class="word-card" id="word-card" onclick="toggleWord()">
+              <div id="word-content">
+                <p style="color:#9ca3af;font-size:12px;margin-bottom:8px;letter-spacing:2px;">YOUR WORD</p>
+                <h2 id="game-word" style="color:#fff;text-shadow:0 0 20px rgba(255,255,255,0.3);font-size:36px;">---</h2>
+              </div>
+              <div id="word-hidden-content" class="hidden">
+                <p class="word-hidden">[ HIDDEN ]</p>
+                <p style="color:#666;font-size:12px;margin-top:8px;">TAP TO SHOW</p>
+              </div>
+            </div>
+            <div class="countdown" id="countdown">AUTO HIDE: 10s</div>
+            <p style="color:#9ca3af;text-align:center;font-size:12px;margin-top:16px;">Listen to others and figure out your role!</p>
+            <p style="color:rgba(34, 211, 238, 0.5);text-align:center;font-size:12px;margin-top:8px;">[ TAP CARD TO HIDE ]</p>
+          </div>
+        </div>
+
+        <div class="card" id="judge-panel" style="display:none">
+          <h3 style="color:#22d3ee;margin-bottom:16px">👨‍⚖️ JUDGE PANEL - All Players' Words</h3>
+          <div id="judge-players"></div>
+          <button class="btn btn-primary" onclick="endGame()" style="margin-top:16px">🏁 END GAME (Start Next Round)</button>
+        </div>
+
+        <div class="card">
+          <button class="btn btn-secondary" onclick="showPage('room-page')">← BACK TO ROOM</button>
+        </div>
       </div>
     </div>
 
@@ -202,17 +300,14 @@
   <div id="how-to-play-modal" onclick="closeHowToPlay(event)">
     <div class="modal-box" onclick="event.stopPropagation()">
       <h2>📖 HOW TO PLAY</h2>
-      
       <h3>🎯 Game Overview</h3>
       <p>"Who's the Spy?" is a fun word-guessing game where players try to identify the hidden spy among them!</p>
-      
       <h3>👥 Roles</h3>
       <ul>
         <li><strong>👨‍⚖️ Judge:</strong> Knows all words, hosts the game</li>
         <li><strong>👥 Civilians:</strong> Get the same word</li>
         <li><strong>🕵️ Spy:</strong> Gets a different word, must hide identity</li>
       </ul>
-      
       <h3>🎮 How to Play</h3>
       <ol>
         <li><strong>Create Room:</strong> One player creates a room and gets a 4-digit room code</li>
@@ -222,13 +317,11 @@
         <li><strong>Describe:</strong> Take turns describing your word without saying it directly</li>
         <li><strong>Vote:</strong> Discuss and vote on who you think is the spy!</li>
       </ol>
-      
       <h3>🏆 Winning</h3>
       <ul>
         <li><strong>Civilians win</strong> if they correctly identify the spy</li>
         <li><strong>Spy wins</strong> if they fool the civilians and avoid detection</li>
       </ul>
-      
       <h3>💡 Tips</h3>
       <ul>
         <li>Be creative with your descriptions!</li>
@@ -236,7 +329,6 @@
         <li>Spy: Try to blend in while being vague</li>
         <li>Civilians: Look for inconsistencies</li>
       </ul>
-      
       <button class="modal-close-btn" onclick="closeHowToPlay()">GOT IT!</button>
     </div>
   </div>
@@ -250,7 +342,10 @@
     let currentPlayer = null;
     let isHost = false;
     let pollInterval = null;
-    let hasAutoRedirected = false; // 防止重复自动跳转
+    let hasAutoRedirected = false;
+    let showWord = true;
+    let countdown = 10;
+    let countdownInterval = null;
 
     const wordPairs = [
       { civilian: 'Apple/苹果', spy: 'Orange/橙子' },
@@ -268,16 +363,13 @@
       { civilian: 'River/河流', spy: 'Lake/湖泊' },
       { civilian: 'Shirt/衬衫', spy: 'T-shirt/T恤' },
       { civilian: 'Shoes/鞋子', spy: 'Boots/靴子' },
-      // 学习用品
       { civilian: 'School/学校', spy: 'Library/图书馆' },
       { civilian: 'Book/书', spy: 'Magazine/杂志' },
       { civilian: 'Pen/钢笔', spy: 'Pencil/铅笔' },
       { civilian: 'Backpack/书包', spy: 'Briefcase/公文包' },
-      // 天气
       { civilian: 'Sunny Day/晴天', spy: 'Cloudy/多云' },
       { civilian: 'Rain/雨', spy: 'Snow/雪' },
       { civilian: 'Star/星星', spy: 'Firefly/萤火虫' },
-      // 日常用品
       { civilian: 'Phone/手机', spy: 'Tablet/平板' },
       { civilian: 'Computer/电脑', spy: 'Laptop/笔记本' },
       { civilian: 'Umbrella/雨伞', spy: 'Raincoat/雨衣' },
@@ -285,16 +377,13 @@
       { civilian: 'Toothbrush/牙刷', spy: 'Toothpaste/牙膏' },
       { civilian: 'Shampoo/洗发水', spy: 'Conditioner/护发素' },
       { civilian: 'Key/钥匙', spy: 'Keychain/钥匙扣' },
-      // 运动
       { civilian: 'Tennis/网球', spy: 'Badminton/羽毛球' },
       { civilian: 'Swimming/游泳', spy: 'Diving/潜水' },
       { civilian: 'Marathon/马拉松', spy: 'Running/跑步' },
       { civilian: 'Skating/滑冰', spy: 'Skiing/滑雪' },
       { civilian: 'Soccer/足球', spy: 'Baseball/棒球' },
-      // 名人
       { civilian: 'Na Ying/那英', spy: 'Han Hong/韩红' },
       { civilian: 'Taylor Swift/泰勒·斯威夫特', spy: 'Adele/阿黛尔' },
-      // 食物
       { civilian: 'Ramen/拉面', spy: 'Udon/乌冬面' },
     ];
 
@@ -309,28 +398,21 @@
     async function supabaseRequest(table, method, body, query) {
       let url = SUPABASE_URL + '/rest/v1/' + table;
       if (query) url += '?' + query;
-
       const headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       };
-
       const options = { method, headers };
       if (body) options.body = JSON.stringify(body);
-
       console.log('API Request:', method, url, body);
-
       const response = await fetch(url, options);
       const responseText = await response.text();
-
       console.log('API Response:', response.status, responseText);
-
       if (!response.ok) {
         throw new Error('HTTP ' + response.status + ': ' + responseText);
       }
-
       return responseText ? JSON.parse(responseText) : null;
     }
 
@@ -352,7 +434,6 @@
 
       try {
         console.log('Creating room...', { roomId, roomCode });
-
         // Create room
         const roomResult = await supabaseRequest('game_rooms', 'POST', {
           id: roomId,
@@ -362,20 +443,18 @@
           word_spy: wordPair.spy
         });
         console.log('Room created:', roomResult);
-
-        // Add host player (not judge, everyone plays)
+        // Add host player
         const playerResult = await supabaseRequest('game_players', 'POST', {
           room_id: roomId,
           player_name: name,
           role: null,
-          word: null
+          word: null,
+          is_online: true
         });
         console.log('Player added:', playerResult);
-
         currentRoom = { id: roomId, code: roomCode, wordPair };
-        currentPlayer = { name: name, role: null, isHost: true };
+        currentPlayer = { id: playerResult[0].id, name: name, role: null, isHost: true };
         isHost = true;
-
         document.getElementById('display-room-code').textContent = roomCode;
         document.getElementById('share-text').textContent = 'Room: ' + roomCode + " - Who's the Spy?";
         showPage('room-page');
@@ -421,24 +500,49 @@
           errorDiv.classList.remove('hidden'); 
           return; 
         }
-        if (players.find(p => p.player_name === name)) { 
+
+        // Check if name exists (case insensitive) - FIXED: Allow rejoin if offline
+        const existingPlayer = players.find(p => p.player_name.toLowerCase() === name.toLowerCase());
+
+        if (existingPlayer) {
+          // If player is offline, allow rejoin (handle both boolean and string)
+          const isOffline = existingPlayer.is_online === false || existingPlayer.is_online === 'false' || existingPlayer.is_online === null;
+          if (isOffline) {
+            // Update player to online
+            await supabaseRequest('game_players', 'PATCH', {
+              is_online: true
+            }, 'id=eq.' + existingPlayer.id);
+            
+            currentRoom = { id: room.id, code: code, wordPair: { civilian: room.word_civilian, spy: room.word_spy } };
+            currentPlayer = { id: existingPlayer.id, name: name, role: existingPlayer.role, isHost: false };
+            isHost = false;
+            document.getElementById('display-room-code').textContent = code;
+            document.getElementById('share-text').textContent = 'Room: ' + code + " - Who's the Spy?";
+            errorDiv.classList.add('hidden');
+            showPage('room-page');
+            updatePlayerList();
+            startPolling();
+            return;
+          }
+          
+          // If player is online, show error
           errorDiv.textContent = 'Name already taken'; 
           errorDiv.classList.remove('hidden'); 
           return; 
         }
 
-        // Add player
-        await supabaseRequest('game_players', 'POST', {
+        // Add new player
+        const playerResult = await supabaseRequest('game_players', 'POST', {
           room_id: room.id,
           player_name: name,
           role: null,
-          word: null
+          word: null,
+          is_online: true
         });
 
         currentRoom = { id: room.id, code: code, wordPair: { civilian: room.word_civilian, spy: room.word_spy } };
-        currentPlayer = { name: name, role: null, isHost: false };
+        currentPlayer = { id: playerResult[0].id, name: name, role: null, isHost: false };
         isHost = false;
-
         document.getElementById('display-room-code').textContent = code;
         document.getElementById('share-text').textContent = 'Room: ' + code + " - Who's the Spy?";
         errorDiv.classList.add('hidden');
@@ -454,29 +558,22 @@
 
     async function startPolling() {
       if (pollInterval) clearInterval(pollInterval);
-      hasAutoRedirected = false; // 重置标志
-
+      hasAutoRedirected = false;
       pollInterval = setInterval(async () => {
         if (!currentRoom) return;
-
         try {
-          // Get room status
           const rooms = await supabaseRequest('game_rooms', 'GET', null, 'id=eq.' + currentRoom.id);
           if (rooms && rooms.length > 0) {
             const room = rooms[0];
-            // 只在第一次检测到游戏开始时自动跳转，之后用户手动返回房间不再跳转
-            if (room.status === 'playing' && !hasAutoRedirected && document.getElementById('room-page').classList.contains('hidden') === false) {
+            if (room.status === 'playing' && !hasAutoRedirected && !document.getElementById('room-page').classList.contains('hidden')) {
               hasAutoRedirected = true;
               showGamePage();
             }
-            // 检测到游戏结束，显示游戏结束页面
-            if (room.status === 'ended' && !document.getElementById('gameover-page').classList.contains('hidden') === false) {
+            if (room.status === 'ended' && !document.getElementById('gameover-page').classList.contains('hidden')) {
               showGameOverPage();
             }
-            // 检测到新一局开始（waiting状态），重置跳转标志
             if (room.status === 'waiting') {
               hasAutoRedirected = false;
-              // 如果在游戏结束页面，自动返回房间
               const gameOverPage = document.getElementById('gameover-page');
               if (gameOverPage && !gameOverPage.classList.contains('hidden')) {
                 showPage('room-page');
@@ -485,8 +582,6 @@
               }
             }
           }
-
-          // Update player list
           updatePlayerList();
         } catch (e) {
           console.error('Poll error:', e);
@@ -496,82 +591,72 @@
 
     async function updatePlayerList() {
       if (!currentRoom) return;
-
       try {
         const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
-        
         const list = document.getElementById('room-players');
         list.innerHTML = players.map(p => {
           let badgeClass = 'badge-waiting', roleText = 'Waiting';
           if (p.role === 'judge') { badgeClass = 'badge-judge'; roleText = 'Judge'; }
           else if (p.role === 'civilian') { badgeClass = 'badge-civilian'; roleText = 'Civilian'; }
           else if (p.role === 'spy') { badgeClass = 'badge-spy'; roleText = 'Spy'; }
-          return '<div class="player-item"><span>' + p.player_name + '</span><span class="badge ' + badgeClass + '">' + roleText + '</span></div>';
+          
+          // Show offline status
+          const isPlayerOffline = p.is_online === false || p.is_online === 'false' || p.is_online === null;
+          const offlineBadge = isPlayerOffline ? ' <span class="badge badge-offline">OFFLINE</span>' : '';
+          
+          return '<div class="player-item"><span>' + p.player_name + offlineBadge + '</span><span class="badge ' + badgeClass + '">' + roleText + '</span></div>';
         }).join('');
 
-        document.getElementById('room-status').textContent = players.length + ' players in room';
+        const onlinePlayers = players.filter(p => p.is_online !== false && p.is_online !== 'false' && p.is_online !== null);
+        document.getElementById('room-status').textContent = onlinePlayers.length + ' players online';
 
         if (isHost) {
           const startBtn = document.getElementById('start-btn');
-          startBtn.disabled = players.length < 4;
-          const spyCount = getSpyCount(players.length);
-          startBtn.textContent = players.length < 4 ? 'START GAME (Need ' + (4-players.length) + ' more)' : '🎮 START GAME (' + players.length + '人: 1法官+' + spyCount + '卧底+' + (players.length - 1 - spyCount) + '平民)';
+          startBtn.disabled = onlinePlayers.length < 3;
+          startBtn.textContent = onlinePlayers.length < 3 ? 'START GAME (Need ' + (3 - onlinePlayers.length) + ' more)' : '🎮 START GAME (' + onlinePlayers.length + ' players)';
         }
       } catch (e) {
         console.error(e);
       }
     }
 
-    // 根据人数计算卧底数量
-    function getSpyCount(playerCount) {
-      if (playerCount <= 6) return 1;
-      if (playerCount <= 9) return 2;
-      return 3;
-    }
-
     async function startGame() {
       if (!isHost || !currentRoom) return;
-
       try {
         const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
-        if (players.length < 4) {
-          alert('Need at least 4 players (1 Judge + 1 Spy + 2 Civilians)');
+        const onlinePlayers = players.filter(p => p.is_online !== false && p.is_online !== 'false' && p.is_online !== null);
+        
+        if (onlinePlayers.length < 3) {
+          alert('Need at least 3 players');
           return;
         }
 
-        // 随机选择1名法官
-        const judgeIndex = Math.floor(Math.random() * players.length);
-        const judge = players[judgeIndex];
+        // Randomly select judge from online players
+        const judgeIndex = Math.floor(Math.random() * onlinePlayers.length);
+        const judge = onlinePlayers[judgeIndex];
 
-        // 设置法官
+        // Set judge
         await supabaseRequest('game_players', 'PATCH', {
           role: 'judge',
           word: 'ALL WORDS'
         }, 'id=eq.' + judge.id);
 
-        // 剩余玩家中分配卧底和平民
-        const nonJudgePlayers = players.filter((_, i) => i !== judgeIndex);
-        const spyCount = getSpyCount(players.length);
+        // Select spy from remaining online players
+        const nonJudgePlayers = onlinePlayers.filter(p => p.id !== judge.id);
+        const spyIndex = Math.floor(Math.random() * nonJudgePlayers.length);
+        const spy = nonJudgePlayers[spyIndex];
 
-        // 随机选择卧底
-        const spyIndices = new Set();
-        while (spyIndices.size < spyCount) {
-          spyIndices.add(Math.floor(Math.random() * nonJudgePlayers.length));
-        }
-
-        // 分配角色
-        for (let i = 0; i < nonJudgePlayers.length; i++) {
-          const isSpy = spyIndices.has(i);
-          const player = nonJudgePlayers[i];
+        // Assign roles
+        for (const player of onlinePlayers) {
+          if (player.id === judge.id) continue;
+          const isSpy = player.id === spy.id;
           await supabaseRequest('game_players', 'PATCH', {
             role: isSpy ? 'spy' : 'civilian',
             word: isSpy ? currentRoom.wordPair.spy : currentRoom.wordPair.civilian
           }, 'id=eq.' + player.id);
         }
 
-        // Update room status
         await supabaseRequest('game_rooms', 'PATCH', { status: 'playing' }, 'id=eq.' + currentRoom.id);
-
         showGamePage();
       } catch (e) {
         alert('Failed to start game: ' + e.message);
@@ -580,45 +665,116 @@
 
     async function showGamePage() {
       if (!currentRoom) return;
-
-      try {
-        const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
-        const me = players.find(p => p.player_name === currentPlayer.name);
-        
-        if (me) {
-          currentPlayer.role = me.role;
-          document.getElementById('game-role').textContent = me.role === 'judge' ? 'JUDGE' : me.role === 'spy' ? 'SPY' : 'CIVILIAN';
-          document.getElementById('game-role').style.color = me.role === 'judge' ? '#22d3ee' : me.role === 'spy' ? '#e879f9' : '#a855f7';
-          document.getElementById('game-word').textContent = me.word || '---';
-
-          if (me.role === 'judge') {
-            document.getElementById('judge-panel').style.display = 'block';
-            document.getElementById('judge-players').innerHTML = players.map(p =>
-              '<div class="player-item"><span>' + p.player_name + '</span><span style="color:#9ca3af">' + p.word + '</span></div>'
-            ).join('');
-          } else {
-            document.getElementById('judge-panel').style.display = 'none';
+      
+      // Show loading first - FIX: Prevent flash of wrong content
+      document.getElementById('game-loading').classList.remove('hidden');
+      document.getElementById('game-content').classList.add('hidden');
+      showPage('game-page');
+      
+      // Wait a bit to ensure data is ready
+      setTimeout(async () => {
+        try {
+          const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
+          const me = players.find(p => p.id === currentPlayer.id);
+          
+          if (me) {
+            currentPlayer.role = me.role;
+            
+            // Hide loading, show content
+            document.getElementById('game-loading').classList.add('hidden');
+            document.getElementById('game-content').classList.remove('hidden');
+            
+            // Update role display - FIX: Only judge sees role, others see ???
+            const roleEl = document.getElementById('game-role');
+            
+            if (me.role === 'judge') {
+              roleEl.textContent = 'JUDGE';
+              roleEl.className = 'role-badge role-judge';
+              document.getElementById('judge-view').style.display = 'block';
+              document.getElementById('player-view').style.display = 'none';
+              document.getElementById('judge-panel').style.display = 'block';
+              document.getElementById('judge-civilian-word').textContent = currentRoom.wordPair.civilian;
+              document.getElementById('judge-spy-word').textContent = currentRoom.wordPair.spy;
+              document.getElementById('judge-players').innerHTML = players.filter(p => p.is_online !== false).map(p =>
+                '<div class="player-item"><span>' + p.player_name + '</span><span style="color:#9ca3af">' + p.word + '</span></div>'
+              ).join('');
+            } else {
+              // FIX: Non-judge players see ??? for role, not actual role
+              roleEl.textContent = '???';
+              roleEl.className = 'role-badge role-unknown';
+              document.getElementById('judge-view').style.display = 'none';
+              document.getElementById('player-view').style.display = 'block';
+              document.getElementById('judge-panel').style.display = 'none';
+              document.getElementById('game-word').textContent = me.word || '---';
+              
+              // Reset and start countdown
+              showWord = true;
+              countdown = 10;
+              updateWordDisplay();
+              startCountdown();
+            }
           }
+        } catch (e) {
+          console.error(e);
         }
+      }, 300); // Delay to ensure data is ready
+    }
 
-        showPage('game-page');
-      } catch (e) {
-        console.error(e);
+    function toggleWord() {
+      showWord = !showWord;
+      updateWordDisplay();
+    }
+
+    function updateWordDisplay() {
+      const wordContent = document.getElementById('word-content');
+      const wordHiddenContent = document.getElementById('word-hidden-content');
+      const wordCard = document.getElementById('word-card');
+      const countdownEl = document.getElementById('countdown');
+
+      if (showWord) {
+        wordContent.classList.remove('hidden');
+        wordHiddenContent.classList.add('hidden');
+        wordCard.classList.remove('hidden-word');
+        countdownEl.style.display = 'block';
+      } else {
+        wordContent.classList.add('hidden');
+        wordHiddenContent.classList.remove('hidden');
+        wordCard.classList.add('hidden-word');
+        countdownEl.style.display = 'none';
       }
     }
 
+    function startCountdown() {
+      if (countdownInterval) clearInterval(countdownInterval);
+      document.getElementById('countdown').textContent = 'AUTO HIDE: ' + countdown + 's';
+      countdownInterval = setInterval(() => {
+        countdown--;
+        document.getElementById('countdown').textContent = 'AUTO HIDE: ' + countdown + 's';
+        if (countdown <= 0) {
+          showWord = false;
+          updateWordDisplay();
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+    }
+
     async function leaveRoom() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      
       if (pollInterval) {
         clearInterval(pollInterval);
         pollInterval = null;
       }
       
-      if (currentRoom && !isHost) {
+      // Mark player as offline instead of deleting
+      if (currentRoom && currentPlayer) {
         try {
-          const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id + '&player_name=eq.' + currentPlayer.name);
-          if (players.length > 0) {
-            await supabaseRequest('game_players', 'DELETE', null, 'id=eq.' + players[0].id);
-          }
+          await supabaseRequest('game_players', 'PATCH', {
+            is_online: false
+          }, 'id=eq.' + currentPlayer.id);
         } catch (e) {
           console.error(e);
         }
@@ -633,7 +789,7 @@
     function copyRoomCode() {
       const code = currentRoom?.code;
       if (code) {
-        navigator.clipboard.writeText("Join my Who's the Spy game! Room code: " + code + " https://69dt2sbdzm-art.github.io/xingge/").then(() => alert('Room code copied!'));
+        navigator.clipboard.writeText("Join my Who's the Spy game! Room code: " + code).then(() => alert('Room code copied!'));
       }
     }
 
@@ -647,12 +803,9 @@
       document.getElementById(id).classList.remove('hidden');
     }
 
-    // 法官结束游戏
     async function endGame() {
-      if (!currentRoom || !currentPlayer.role === 'judge') return;
-
+      if (!currentRoom || currentPlayer.role !== 'judge') return;
       try {
-        // 将房间状态改为 ended
         await supabaseRequest('game_rooms', 'PATCH', { status: 'ended' }, 'id=eq.' + currentRoom.id);
         showGameOverPage();
       } catch (e) {
@@ -661,29 +814,24 @@
       }
     }
 
-    // 显示游戏结束页面
     async function showGameOverPage() {
       if (!currentRoom) return;
-
       try {
         const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
-        const me = players.find(p => p.player_name === currentPlayer.name);
-
-        // 显示所有玩家角色
+        const me = players.find(p => p.id === currentPlayer.id);
         const spies = players.filter(p => p.role === 'spy').map(p => p.player_name);
         const civilians = players.filter(p => p.role === 'civilian').map(p => p.player_name);
         const judge = players.find(p => p.role === 'judge');
 
         let resultHtml = '<div style="margin:10px 0;">';
         resultHtml += '<p style="color:#22d3ee">👨‍⚖️ Judge: ' + (judge ? judge.player_name : 'N/A') + '</p>';
-        resultHtml += '<p style="color:#e879f9">🕵️ Spies: ' + spies.join(', ') + '</p>';
+        resultHtml += '<p style="color:#e879f9">🕵️ Spy: ' + spies.join(', ') + '</p>';
         resultHtml += '<p style="color:#a855f7">👥 Civilians: ' + civilians.join(', ') + '</p>';
         resultHtml += '</div>';
-        resultHtml += '<p style="color:#9ca3af;margin-top:16px;font-size:14px">Who won? Judge decides!</p>';
+        resultHtml += '<p style="color:#9ca3af;margin-top:16px;font-size:14px">Words: ' + currentRoom.wordPair.civilian + ' / ' + currentRoom.wordPair.spy + '</p>';
 
         document.getElementById('game-result').innerHTML = resultHtml;
 
-        // 只有法官可以开始下一局
         if (me && me.role === 'judge') {
           document.getElementById('judge-next-controls').style.display = 'block';
         } else {
@@ -696,17 +844,14 @@
       }
     }
 
-    // 返回房间（从游戏结束页）
     async function backToRoom() {
-      // 检查房间状态
       if (currentRoom) {
         try {
           const rooms = await supabaseRequest('game_rooms', 'GET', null, 'id=eq.' + currentRoom.id);
           if (rooms && rooms.length > 0 && rooms[0].status === 'ended') {
-            // 游戏已结束，显示等待法官开始下一局
             showPage('room-page');
             document.getElementById('room-status').textContent = 'Game ended. Waiting for judge to start next round...';
-            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('start-btn').style.display = isHost ? 'block' : 'none';
           } else {
             showPage('room-page');
           }
@@ -718,12 +863,9 @@
       }
     }
 
-    // 开始下一局
     async function startNextRound() {
       if (!currentRoom) return;
-
       try {
-        // 1. 重置所有玩家角色
         const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
         for (const player of players) {
           await supabaseRequest('game_players', 'PATCH', {
@@ -732,7 +874,6 @@
           }, 'id=eq.' + player.id);
         }
 
-        // 2. 选择新的词组
         const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
         await supabaseRequest('game_rooms', 'PATCH', {
           status: 'waiting',
@@ -740,19 +881,13 @@
           word_spy: wordPair.spy
         }, 'id=eq.' + currentRoom.id);
 
-        // 更新当前房间的词组
         currentRoom.wordPair = wordPair;
-
-        // 3. 重置本地状态
         currentPlayer.role = null;
         hasAutoRedirected = false;
 
-        // 4. 返回房间页面
         showPage('room-page');
         document.getElementById('room-status').textContent = 'New round! Click START GAME when ready.';
         document.getElementById('start-btn').style.display = 'block';
-
-        // 刷新玩家列表
         updatePlayerList();
       } catch (e) {
         console.error('Start next round error:', e);
