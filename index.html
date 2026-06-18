@@ -223,7 +223,7 @@
   <script>
     // Supabase Config
     const SUPABASE_URL = 'https://xoezrfiotyddjaozswtq.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_wrDWz74j98kGXUOkrtDFrQ_3Hpp_za_';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvZXpyZmlvdHlkZGphb3pzd3RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDc3MTgsImV4cCI6MjA5NzMyMzcxOH0.iUGRomRiVgwTBq6ea7MX6dJKApsE6wvfRxlSc5g-FnM';
     
     let currentRoom = null;
     let currentPlayer = null;
@@ -259,23 +259,29 @@
     async function supabaseRequest(table, method, body, query) {
       let url = SUPABASE_URL + '/rest/v1/' + table;
       if (query) url += '?' + query;
-      
+
       const headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'Content-Type': 'application/json',
-        'Prefer': method === 'POST' ? 'return=representation' : 'return=representation'
+        'Prefer': 'return=representation'
       };
-      
+
       const options = { method, headers };
       if (body) options.body = JSON.stringify(body);
-      
+
+      console.log('API Request:', method, url, body);
+
       const response = await fetch(url, options);
+      const responseText = await response.text();
+
+      console.log('API Response:', response.status, responseText);
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        throw new Error('HTTP ' + response.status + ': ' + responseText);
       }
-      return response.json();
+
+      return responseText ? JSON.parse(responseText) : null;
     }
 
     function showHowToPlay() {
@@ -295,22 +301,26 @@
       const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
 
       try {
+        console.log('Creating room...', { roomId, roomCode });
+
         // Create room
-        await supabaseRequest('game_rooms', 'POST', {
+        const roomResult = await supabaseRequest('game_rooms', 'POST', {
           id: roomId,
           room_code: roomCode,
           status: 'waiting',
           word_civilian: wordPair.civilian,
           word_spy: wordPair.spy
         });
+        console.log('Room created:', roomResult);
 
         // Add judge player
-        await supabaseRequest('game_players', 'POST', {
+        const playerResult = await supabaseRequest('game_players', 'POST', {
           room_id: roomId,
           player_name: name,
           role: 'judge',
           word: 'ALL WORDS'
         });
+        console.log('Player added:', playerResult);
 
         currentRoom = { id: roomId, code: roomCode, wordPair };
         currentPlayer = { name: name, role: 'judge', isHost: true };
@@ -322,8 +332,8 @@
         updatePlayerList();
         startPolling();
       } catch (e) {
-        alert('Failed to create room: ' + e.message);
-        console.error(e);
+        console.error('Create room error:', e);
+        alert('Failed to create room: ' + e.message + '\n\nPlease check console for details.');
       }
     }
 
@@ -485,4 +495,64 @@
         if (me) {
           currentPlayer.role = me.role;
           document.getElementById('game-role').textContent = me.role === 'judge' ? 'JUDGE' : me.role === 'spy' ? 'SPY' : 'CIVILIAN';
-          document.getElementById('game-role').style.color = me.role === 'judge' ? '#22d3ee' : me.role
+          document.getElementById('game-role').style.color = me.role === 'judge' ? '#22d3ee' : me.role === 'spy' ? '#e879f9' : '#a855f7';
+          document.getElementById('game-word').textContent = me.word || '---';
+
+          if (me.role === 'judge') {
+            document.getElementById('judge-panel').style.display = 'block';
+            document.getElementById('judge-players').innerHTML = players.map(p =>
+              '<div class="player-item"><span>' + p.player_name + '</span><span style="color:#9ca3af">' + p.word + '</span></div>'
+            ).join('');
+          } else {
+            document.getElementById('judge-panel').style.display = 'none';
+          }
+        }
+
+        showPage('game-page');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function leaveRoom() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+      
+      if (currentRoom && !isHost) {
+        try {
+          const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id + '&player_name=eq.' + currentPlayer.name);
+          if (players.length > 0) {
+            await supabaseRequest('game_players', 'DELETE', null, 'id=eq.' + players[0].id);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      
+      currentRoom = null;
+      currentPlayer = null;
+      isHost = false;
+      showPage('home-page');
+    }
+
+    function copyRoomCode() {
+      const code = currentRoom?.code;
+      if (code) {
+        navigator.clipboard.writeText("Join my Who's the Spy game! Room code: " + code + " https://69dt2sbdzm-art.github.io/xingge/").then(() => alert('Room code copied!'));
+      }
+    }
+
+    function showJoin() {
+      document.getElementById('join-name').value = document.getElementById('player-name').value.trim();
+      showPage('join-page');
+    }
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
