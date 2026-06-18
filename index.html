@@ -170,9 +170,30 @@
       <div class="card" id="judge-panel" style="display:none">
         <h3 style="color:#22d3ee;margin-bottom:16px">👨‍⚖️ JUDGE PANEL - All Players' Words</h3>
         <div id="judge-players"></div>
+        <button class="btn btn-primary" onclick="endGame()" style="margin-top:16px">🏁 END GAME (Start Next Round)</button>
       </div>
       <div class="card">
         <button class="btn btn-secondary" onclick="showPage('room-page')">← BACK TO ROOM</button>
+      </div>
+    </div>
+
+    <!-- Game Over Page -->
+    <div id="gameover-page" class="page hidden">
+      <div class="header"><h1>🎉 GAME OVER</h1></div>
+      <div class="card">
+        <div class="word-display">
+          <p style="color:#9ca3af;font-size:16px">Round Complete!</p>
+          <h2 style="color:#22d3ee;margin:20px 0">Who Won?</h2>
+          <div id="game-result" style="margin:20px 0;font-size:18px"></div>
+        </div>
+      </div>
+      <div class="card" id="judge-next-controls" style="display:none">
+        <h3 style="color:#22d3ee;margin-bottom:16px">👨‍⚖️ Judge Controls</h3>
+        <p style="color:#9ca3af;margin-bottom:16px;font-size:14px">Start a new round with the same players?</p>
+        <button class="btn btn-primary" onclick="startNextRound()">🎮 START NEXT ROUND</button>
+      </div>
+      <div class="card">
+        <button class="btn btn-secondary" onclick="backToRoom()">← BACK TO ROOM</button>
       </div>
     </div>
   </div>
@@ -229,6 +250,7 @@
     let currentPlayer = null;
     let isHost = false;
     let pollInterval = null;
+    let hasAutoRedirected = false; // 防止重复自动跳转
 
     const wordPairs = [
       { civilian: 'Apple/苹果', spy: 'Orange/橙子' },
@@ -313,17 +335,17 @@
         });
         console.log('Room created:', roomResult);
 
-        // Add judge player
+        // Add host player (not judge, everyone plays)
         const playerResult = await supabaseRequest('game_players', 'POST', {
           room_id: roomId,
           player_name: name,
-          role: 'judge',
-          word: 'ALL WORDS'
+          role: null,
+          word: null
         });
         console.log('Player added:', playerResult);
 
         currentRoom = { id: roomId, code: roomCode, wordPair };
-        currentPlayer = { name: name, role: 'judge', isHost: true };
+        currentPlayer = { name: name, role: null, isHost: true };
         isHost = true;
 
         document.getElementById('display-room-code').textContent = roomCode;
@@ -404,20 +426,38 @@
 
     async function startPolling() {
       if (pollInterval) clearInterval(pollInterval);
-      
+      hasAutoRedirected = false; // 重置标志
+
       pollInterval = setInterval(async () => {
         if (!currentRoom) return;
-        
+
         try {
           // Get room status
           const rooms = await supabaseRequest('game_rooms', 'GET', null, 'id=eq.' + currentRoom.id);
           if (rooms && rooms.length > 0) {
             const room = rooms[0];
-            if (room.status === 'playing' && document.getElementById('room-page').classList.contains('hidden') === false) {
+            // 只在第一次检测到游戏开始时自动跳转，之后用户手动返回房间不再跳转
+            if (room.status === 'playing' && !hasAutoRedirected && document.getElementById('room-page').classList.contains('hidden') === false) {
+              hasAutoRedirected = true;
               showGamePage();
             }
+            // 检测到游戏结束，显示游戏结束页面
+            if (room.status === 'ended' && !document.getElementById('gameover-page').classList.contains('hidden') === false) {
+              showGameOverPage();
+            }
+            // 检测到新一局开始（waiting状态），重置跳转标志
+            if (room.status === 'waiting') {
+              hasAutoRedirected = false;
+              // 如果在游戏结束页面，自动返回房间
+              const gameOverPage = document.getElementById('gameover-page');
+              if (gameOverPage && !gameOverPage.classList.contains('hidden')) {
+                showPage('room-page');
+                document.getElementById('room-status').textContent = 'New round! Click START GAME when ready.';
+                document.getElementById('start-btn').style.display = 'block';
+              }
+            }
           }
-          
+
           // Update player list
           updatePlayerList();
         } catch (e) {
@@ -445,12 +485,20 @@
 
         if (isHost) {
           const startBtn = document.getElementById('start-btn');
-          startBtn.disabled = players.length < 3;
-          startBtn.textContent = players.length < 3 ? 'START GAME (Need ' + (3-players.length) + ' more)' : '🎮 START GAME';
+          startBtn.disabled = players.length < 4;
+          const spyCount = getSpyCount(players.length);
+          startBtn.textContent = players.length < 4 ? 'START GAME (Need ' + (4-players.length) + ' more)' : '🎮 START GAME (' + players.length + '人: 1法官+' + spyCount + '卧底+' + (players.length - 1 - spyCount) + '平民)';
         }
       } catch (e) {
         console.error(e);
       }
+    }
+
+    // 根据人数计算卧底数量
+    function getSpyCount(playerCount) {
+      if (playerCount <= 6) return 1;
+      if (playerCount <= 9) return 2;
+      return 3;
     }
 
     async function startGame() {
@@ -458,18 +506,35 @@
 
       try {
         const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
-        if (players.length < 3) { 
-          alert('Need at least 3 players'); 
-          return; 
+        if (players.length < 4) {
+          alert('Need at least 4 players (1 Judge + 1 Spy + 2 Civilians)');
+          return;
         }
 
-        // Assign roles
-        const nonJudge = players.filter(p => p.role !== 'judge');
-        const spyIndex = Math.floor(Math.random() * nonJudge.length);
+        // 随机选择1名法官
+        const judgeIndex = Math.floor(Math.random() * players.length);
+        const judge = players[judgeIndex];
 
-        for (let i = 0; i < nonJudge.length; i++) {
-          const isSpy = i === spyIndex;
-          const player = nonJudge[i];
+        // 设置法官
+        await supabaseRequest('game_players', 'PATCH', {
+          role: 'judge',
+          word: 'ALL WORDS'
+        }, 'id=eq.' + judge.id);
+
+        // 剩余玩家中分配卧底和平民
+        const nonJudgePlayers = players.filter((_, i) => i !== judgeIndex);
+        const spyCount = getSpyCount(players.length);
+
+        // 随机选择卧底
+        const spyIndices = new Set();
+        while (spyIndices.size < spyCount) {
+          spyIndices.add(Math.floor(Math.random() * nonJudgePlayers.length));
+        }
+
+        // 分配角色
+        for (let i = 0; i < nonJudgePlayers.length; i++) {
+          const isSpy = spyIndices.has(i);
+          const player = nonJudgePlayers[i];
           await supabaseRequest('game_players', 'PATCH', {
             role: isSpy ? 'spy' : 'civilian',
             word: isSpy ? currentRoom.wordPair.spy : currentRoom.wordPair.civilian
@@ -478,7 +543,7 @@
 
         // Update room status
         await supabaseRequest('game_rooms', 'PATCH', { status: 'playing' }, 'id=eq.' + currentRoom.id);
-        
+
         showGamePage();
       } catch (e) {
         alert('Failed to start game: ' + e.message);
@@ -552,6 +617,119 @@
     function showPage(id) {
       document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
       document.getElementById(id).classList.remove('hidden');
+    }
+
+    // 法官结束游戏
+    async function endGame() {
+      if (!currentRoom || !currentPlayer.role === 'judge') return;
+
+      try {
+        // 将房间状态改为 ended
+        await supabaseRequest('game_rooms', 'PATCH', { status: 'ended' }, 'id=eq.' + currentRoom.id);
+        showGameOverPage();
+      } catch (e) {
+        console.error('End game error:', e);
+        alert('Failed to end game');
+      }
+    }
+
+    // 显示游戏结束页面
+    async function showGameOverPage() {
+      if (!currentRoom) return;
+
+      try {
+        const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
+        const me = players.find(p => p.player_name === currentPlayer.name);
+
+        // 显示所有玩家角色
+        const spies = players.filter(p => p.role === 'spy').map(p => p.player_name);
+        const civilians = players.filter(p => p.role === 'civilian').map(p => p.player_name);
+        const judge = players.find(p => p.role === 'judge');
+
+        let resultHtml = '<div style="margin:10px 0;">';
+        resultHtml += '<p style="color:#22d3ee">👨‍⚖️ Judge: ' + (judge ? judge.player_name : 'N/A') + '</p>';
+        resultHtml += '<p style="color:#e879f9">🕵️ Spies: ' + spies.join(', ') + '</p>';
+        resultHtml += '<p style="color:#a855f7">👥 Civilians: ' + civilians.join(', ') + '</p>';
+        resultHtml += '</div>';
+        resultHtml += '<p style="color:#9ca3af;margin-top:16px;font-size:14px">Who won? Judge decides!</p>';
+
+        document.getElementById('game-result').innerHTML = resultHtml;
+
+        // 只有法官可以开始下一局
+        if (me && me.role === 'judge') {
+          document.getElementById('judge-next-controls').style.display = 'block';
+        } else {
+          document.getElementById('judge-next-controls').style.display = 'none';
+        }
+
+        showPage('gameover-page');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 返回房间（从游戏结束页）
+    async function backToRoom() {
+      // 检查房间状态
+      if (currentRoom) {
+        try {
+          const rooms = await supabaseRequest('game_rooms', 'GET', null, 'id=eq.' + currentRoom.id);
+          if (rooms && rooms.length > 0 && rooms[0].status === 'ended') {
+            // 游戏已结束，显示等待法官开始下一局
+            showPage('room-page');
+            document.getElementById('room-status').textContent = 'Game ended. Waiting for judge to start next round...';
+            document.getElementById('start-btn').style.display = 'none';
+          } else {
+            showPage('room-page');
+          }
+        } catch (e) {
+          showPage('room-page');
+        }
+      } else {
+        showPage('room-page');
+      }
+    }
+
+    // 开始下一局
+    async function startNextRound() {
+      if (!currentRoom) return;
+
+      try {
+        // 1. 重置所有玩家角色
+        const players = await supabaseRequest('game_players', 'GET', null, 'room_id=eq.' + currentRoom.id);
+        for (const player of players) {
+          await supabaseRequest('game_players', 'PATCH', {
+            role: null,
+            word: null
+          }, 'id=eq.' + player.id);
+        }
+
+        // 2. 选择新的词组
+        const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+        await supabaseRequest('game_rooms', 'PATCH', {
+          status: 'waiting',
+          word_civilian: wordPair.civilian,
+          word_spy: wordPair.spy
+        }, 'id=eq.' + currentRoom.id);
+
+        // 更新当前房间的词组
+        currentRoom.wordPair = wordPair;
+
+        // 3. 重置本地状态
+        currentPlayer.role = null;
+        hasAutoRedirected = false;
+
+        // 4. 返回房间页面
+        showPage('room-page');
+        document.getElementById('room-status').textContent = 'New round! Click START GAME when ready.';
+        document.getElementById('start-btn').style.display = 'block';
+
+        // 刷新玩家列表
+        updatePlayerList();
+      } catch (e) {
+        console.error('Start next round error:', e);
+        alert('Failed to start next round: ' + e.message);
+      }
     }
   </script>
 </body>
