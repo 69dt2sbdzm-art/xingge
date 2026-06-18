@@ -32,13 +32,8 @@
     .hidden { display: none !important; }
     .status { text-align: center; color: #9ca3af; margin: 10px 0; }
     .error { color: #ef4444; text-align: center; margin: 10px 0; }
-    .success { color: #22c55e; text-align: center; margin: 10px 0; }
     .qr-section { text-align: center; margin: 20px 0; }
     .share-text { background: rgba(34, 211, 238, 0.1); padding: 12px; border-radius: 8px; margin: 10px 0; font-size: 14px; color: #22d3ee; word-break: break-all; }
-    .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(34, 211, 238, 0.3); border-top-color: #22d3ee; border-radius: 50%; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .pulse { animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     .badge-judge { background: #22d3ee; color: #000; }
     .badge-civilian { background: #a855f7; color: #fff; }
@@ -46,92 +41,70 @@
     .badge-waiting { background: rgba(255,255,255,0.1); color: #9ca3af; }
     
     /* Modal Styles */
-    .modal-overlay {
+    #how-to-play-modal {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 1000;
+      display: none;
+    }
+    #how-to-play-modal.show {
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s ease;
     }
-    .modal-overlay.active {
-      opacity: 1;
-      visibility: visible;
-    }
-    .modal-content {
+    .modal-box {
       background: linear-gradient(135deg, #1a1a2e 0%, #0a0a0f 100%);
-      border: 1px solid rgba(34, 211, 238, 0.5);
+      border: 2px solid #22d3ee;
       border-radius: 20px;
       padding: 30px;
       max-width: 90%;
-      width: 400px;
-      max-height: 80vh;
+      width: 420px;
+      max-height: 85vh;
       overflow-y: auto;
-      transform: scale(0.9);
-      transition: transform 0.3s ease;
+      margin: 20px;
     }
-    .modal-overlay.active .modal-content {
-      transform: scale(1);
-    }
-    .modal-header {
+    .modal-box h2 {
+      color: #22d3ee;
       text-align: center;
       margin-bottom: 20px;
-    }
-    .modal-header h2 {
-      color: #22d3ee;
       font-size: 24px;
-      margin-bottom: 8px;
     }
-    .modal-header p {
-      color: #9ca3af;
-      font-size: 14px;
-    }
-    .modal-body {
-      color: #fff;
-      line-height: 1.8;
-      font-size: 14px;
-      margin-bottom: 20px;
-    }
-    .modal-body h3 {
+    .modal-box h3 {
       color: #e879f9;
+      margin: 20px 0 10px 0;
       font-size: 16px;
-      margin: 16px 0 8px 0;
     }
-    .modal-body ul {
-      padding-left: 20px;
+    .modal-box p, .modal-box li {
+      color: #fff;
+      line-height: 1.7;
+      font-size: 14px;
       margin: 8px 0;
     }
-    .modal-body li {
+    .modal-box ul, .modal-box ol {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+    .modal-box li {
       margin: 6px 0;
     }
-    .modal-footer {
-      text-align: center;
-    }
-    .modal-btn {
+    .modal-close-btn {
       background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
       color: #000;
       border: none;
-      padding: 12px 40px;
-      border-radius: 8px;
+      padding: 14px 40px;
+      border-radius: 10px;
       font-weight: bold;
       cursor: pointer;
       font-size: 16px;
+      margin-top: 20px;
+      width: 100%;
     }
-    .modal-btn:hover {
+    .modal-close-btn:hover {
       transform: translateY(-2px);
-    }
-    .role-icon {
-      display: inline-block;
-      width: 20px;
-      text-align: center;
-      margin-right: 8px;
     }
   </style>
 </head>
@@ -141,7 +114,7 @@
     <div id="home-page" class="page">
       <div class="header">
         <h1>🕵️ WHO'S THE SPY?</h1>
-        <p style="color:#9ca3af">谁是卧底 — English Edition</p>
+        <p style="color:#9ca3af">English Edition</p>
       </div>
       <div class="card">
         <input type="text" id="player-name" class="input" placeholder="Enter your name" maxlength="20">
@@ -206,50 +179,45 @@
   </div>
 
   <!-- How To Play Modal -->
-  <div id="how-to-play-modal" class="modal-overlay" onclick="closeHowToPlay(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-      <div class="modal-header">
-        <h2>📖 HOW TO PLAY</h2>
-        <p>Game Rules & Instructions</p>
-      </div>
-      <div class="modal-body">
-        <h3>🎯 Game Overview</h3>
-        <p>"Who's the Spy?" is a fun word-guessing game where players try to identify the hidden spy among them!</p>
-        
-        <h3>👥 Roles</h3>
-        <ul>
-          <li><span class="role-icon">👨‍⚖️</span><strong>Judge:</strong> Knows all words, hosts the game</li>
-          <li><span class="role-icon">👥</span><strong>Civilians:</strong> Get the same word</li>
-          <li><span class="role-icon">🕵️</span><strong>Spy:</strong> Gets a different word, must hide identity</li>
-        </ul>
-        
-        <h3>🎮 How to Play</h3>
-        <ol>
-          <li><strong>Create Room:</strong> One player creates a room and gets a 4-digit room code</li>
-          <li><strong>Join:</strong> Other players enter the room code to join</li>
-          <li><strong>Start:</strong> Judge clicks "Start Game" (needs 3+ players)</li>
-          <li><strong>Get Words:</strong> Everyone secretly views their assigned word</li>
-          <li><strong>Describe:</strong> Take turns describing your word without saying it directly</li>
-          <li><strong>Vote:</strong> Discuss and vote on who you think is the spy!</li>
-        </ol>
-        
-        <h3>🏆 Winning</h3>
-        <ul>
-          <li><strong>Civilians win</strong> if they correctly identify the spy</li>
-          <li><strong>Spy wins</strong> if they fool the civilians and avoid detection</li>
-        </ul>
-        
-        <h3>💡 Tips</h3>
-        <ul>
-          <li>Be creative with your descriptions!</li>
-          <li>Pay attention to others' clues</li>
-          <li>Spy: Try to blend in while being vague</li>
-          <li>Civilians: Look for inconsistencies</li>
-        </ul>
-      </div>
-      <div class="modal-footer">
-        <button class="modal-btn" onclick="closeHowToPlay()">GOT IT!</button>
-      </div>
+  <div id="how-to-play-modal" onclick="closeHowToPlay(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h2>📖 HOW TO PLAY</h2>
+      
+      <h3>🎯 Game Overview</h3>
+      <p>"Who's the Spy?" is a fun word-guessing game where players try to identify the hidden spy among them!</p>
+      
+      <h3>👥 Roles</h3>
+      <ul>
+        <li><strong>👨‍⚖️ Judge:</strong> Knows all words, hosts the game</li>
+        <li><strong>👥 Civilians:</strong> Get the same word</li>
+        <li><strong>🕵️ Spy:</strong> Gets a different word, must hide identity</li>
+      </ul>
+      
+      <h3>🎮 How to Play</h3>
+      <ol>
+        <li><strong>Create Room:</strong> One player creates a room and gets a 4-digit room code</li>
+        <li><strong>Join:</strong> Other players enter the room code to join</li>
+        <li><strong>Start:</strong> Judge clicks "Start Game" (needs 3+ players)</li>
+        <li><strong>Get Words:</strong> Everyone secretly views their assigned word</li>
+        <li><strong>Describe:</strong> Take turns describing your word without saying it directly</li>
+        <li><strong>Vote:</strong> Discuss and vote on who you think is the spy!</li>
+      </ol>
+      
+      <h3>🏆 Winning</h3>
+      <ul>
+        <li><strong>Civilians win</strong> if they correctly identify the spy</li>
+        <li><strong>Spy wins</strong> if they fool the civilians and avoid detection</li>
+      </ul>
+      
+      <h3>💡 Tips</h3>
+      <ul>
+        <li>Be creative with your descriptions!</li>
+        <li>Pay attention to others' clues</li>
+        <li>Spy: Try to blend in while being vague</li>
+        <li>Civilians: Look for inconsistencies</li>
+      </ul>
+      
+      <button class="modal-close-btn" onclick="closeHowToPlay()">GOT IT!</button>
     </div>
   </div>
 
@@ -291,13 +259,12 @@
 
     // How To Play Modal Functions
     function showHowToPlay() {
-      document.getElementById('how-to-play-modal').classList.add('active');
+      document.getElementById('how-to-play-modal').classList.add('show');
     }
 
     function closeHowToPlay(event) {
-      if (!event || event.target === document.getElementById('how-to-play-modal')) {
-        document.getElementById('how-to-play-modal').classList.remove('active');
-      }
+      // 直接关闭弹窗，不判断event来源（支持点击遮罩和点击按钮两种方式）
+      document.getElementById('how-to-play-modal').classList.remove('show');
     }
 
     async function createRoom() {
@@ -331,7 +298,7 @@
         isHost = true;
 
         document.getElementById('display-room-code').textContent = roomCode;
-        document.getElementById('share-text').textContent = 'Room: ' + roomCode + ' - Who\'s the Spy?';
+        document.getElementById('share-text').textContent = 'Room: ' + roomCode + " - Who's the Spy?";
         showPage('room-page');
         subscribeToRoom(roomId);
       } catch (e) {
@@ -372,7 +339,7 @@
         isHost = false;
 
         document.getElementById('display-room-code').textContent = code;
-        document.getElementById('share-text').textContent = 'Room: ' + code + ' - Who\'s the Spy?';
+        document.getElementById('share-text').textContent = 'Room: ' + code + " - Who's the Spy?";
         errorDiv.classList.add('hidden');
         showPage('room-page');
         subscribeToRoom(room.id);
@@ -481,7 +448,7 @@
     function copyRoomCode() {
       const code = currentRoom?.code;
       if (code) {
-        navigator.clipboard.writeText('Room: ' + code + ' - Who\'s the Spy?').then(() => alert('Room code copied!'));
+        navigator.clipboard.writeText('Room: ' + code + " - Who's the Spy?").then(() => alert('Room code copied!'));
       }
     }
 
