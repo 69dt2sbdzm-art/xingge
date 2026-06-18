@@ -222,10 +222,20 @@
   </div>
 
   <script>
-    // Meoo Cloud Config
+    // Meoo Cloud Config - 使用固定的 Supabase 连接
     const SUPABASE_URL = 'https://q4gno1xecrv5.meoo.host/sb-api';
     const SUPABASE_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzgxMzM3NjM2LCJleHAiOjEzMjkxOTc3NjM2fQ._9Yh08IrLNV35-Vi92qDrjHcUpg0PCVZ3nO-us_xa9o';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 创建 Supabase 客户端，添加 fetch 选项处理 CORS
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      },
+      global: {
+        fetch: (url, options) => fetch(url, { ...options, mode: 'cors' })
+      }
+    });
 
     let currentRoom = null;
     let currentPlayer = null;
@@ -276,6 +286,8 @@
       const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
 
       try {
+        console.log('Creating room...', { roomId, roomCode });
+
         const { error: roomError } = await supabase.from('game_rooms').insert({
           id: roomId,
           room_code: roomCode,
@@ -283,7 +295,10 @@
           word_civilian: wordPair.civilian,
           word_spy: wordPair.spy
         });
-        if (roomError) throw roomError;
+        if (roomError) {
+          console.error('Room insert error:', roomError);
+          throw roomError;
+        }
 
         const { error: playerError } = await supabase.from('game_players').insert({
           room_id: roomId,
@@ -291,7 +306,10 @@
           role: 'judge',
           word: 'ALL WORDS'
         });
-        if (playerError) throw playerError;
+        if (playerError) {
+          console.error('Player insert error:', playerError);
+          throw playerError;
+        }
 
         currentRoom = { id: roomId, code: roomCode, wordPair };
         currentPlayer = { name, role: 'judge' };
@@ -302,7 +320,8 @@
         showPage('room-page');
         subscribeToRoom(roomId);
       } catch (e) {
-        alert('Failed to create room: ' + e.message);
+        console.error('Create room error:', e);
+        alert('Failed to create room: ' + (e.message || 'Unknown error'));
       }
     }
 
