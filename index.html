@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-  <title>谁是卧底 - 单机版</title>
+  <title>Who's the Spy? - English Edition</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -11,81 +12,258 @@
       background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
       min-height: 100vh;
       color: #fff;
-      padding: 20px;
     }
-    .page { min-height: 100vh; display: flex; flex-direction: column; }
+    .page { min-height: 100vh; padding: 20px; display: flex; flex-direction: column; }
     .header { text-align: center; padding: 20px 0; }
     .header h1 { font-size: 28px; background: linear-gradient(90deg, #22d3ee, #e879f9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(34, 211, 238, 0.3); border-radius: 16px; padding: 24px; margin-bottom: 16px; }
-    .btn { display: block; width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; text-align: center; }
+    .btn { display: block; width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; text-align: center; transition: all 0.3s; }
+    .btn:hover { transform: translateY(-2px); }
     .btn-primary { background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%); color: #000; }
+    .btn-primary:disabled { background: rgba(34, 211, 238, 0.3); color: #666; cursor: not-allowed; transform: none; }
     .btn-secondary { background: rgba(255,255,255,0.1); color: #22d3ee; border: 1px solid rgba(34, 211, 238, 0.3); }
     .input { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid rgba(34, 211, 238, 0.3); background: rgba(255,255,255,0.05); color: #fff; font-size: 16px; margin-bottom: 12px; }
+    .input:focus { outline: none; border-color: #22d3ee; }
     .room-code { text-align: center; font-size: 48px; color: #22d3ee; letter-spacing: 8px; margin: 20px 0; font-weight: bold; }
+    .player-list { margin-top: 20px; }
+    .player-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 8px; }
     .word-display { text-align: center; padding: 40px 20px; }
     .word-display h2 { font-size: 42px; color: #22d3ee; margin: 20px 0; }
     .hidden { display: none !important; }
-    .player-item { display: flex; justify-content: space-between; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 8px; }
+    .status { text-align: center; color: #9ca3af; margin: 10px 0; }
+    .error { color: #ef4444; text-align: center; margin: 10px 0; }
+    .success { color: #22c55e; text-align: center; margin: 10px 0; }
+    .qr-section { text-align: center; margin: 20px 0; }
+    .share-text { background: rgba(34, 211, 238, 0.1); padding: 12px; border-radius: 8px; margin: 10px 0; font-size: 14px; color: #22d3ee; word-break: break-all; }
+    .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(34, 211, 238, 0.3); border-top-color: #22d3ee; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-judge { background: #22d3ee; color: #000; }
+    .badge-civilian { background: #a855f7; color: #fff; }
+    .badge-spy { background: #e879f9; color: #000; }
+    .badge-waiting { background: rgba(255,255,255,0.1); color: #9ca3af; }
+    
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      background: linear-gradient(135deg, #1a1a2e 0%, #0a0a0f 100%);
+      border: 1px solid rgba(34, 211, 238, 0.5);
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 90%;
+      width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+    .modal-overlay.active .modal-content {
+      transform: scale(1);
+    }
+    .modal-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .modal-header h2 {
+      color: #22d3ee;
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .modal-header p {
+      color: #9ca3af;
+      font-size: 14px;
+    }
+    .modal-body {
+      color: #fff;
+      line-height: 1.8;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .modal-body h3 {
+      color: #e879f9;
+      font-size: 16px;
+      margin: 16px 0 8px 0;
+    }
+    .modal-body ul {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+    .modal-body li {
+      margin: 6px 0;
+    }
+    .modal-footer {
+      text-align: center;
+    }
+    .modal-btn {
+      background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+      color: #000;
+      border: none;
+      padding: 12px 40px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .modal-btn:hover {
+      transform: translateY(-2px);
+    }
+    .role-icon {
+      display: inline-block;
+      width: 20px;
+      text-align: center;
+      margin-right: 8px;
+    }
   </style>
 </head>
 <body>
   <div id="app">
+    <!-- 首页 -->
     <div id="home-page" class="page">
       <div class="header">
         <h1>🕵️ WHO'S THE SPY?</h1>
-        <p style="color:#9ca3af">单机版 - 同一设备轮流玩</p>
+        <p style="color:#9ca3af">谁是卧底 — English Edition</p>
       </div>
       <div class="card">
-        <input type="text" id="player-name" class="input" placeholder="输入你的名字" maxlength="20">
-        <button class="btn btn-primary" onclick="createRoom()">🏠 创建房间</button>
-        <button class="btn btn-secondary" onclick="showJoin()">🔑 加入房间</button>
+        <input type="text" id="player-name" class="input" placeholder="Enter your name" maxlength="20">
+        <button class="btn btn-primary" onclick="createRoom()">🏠 CREATE ROOM</button>
+        <button class="btn btn-secondary" onclick="showJoin()">🔑 JOIN ROOM</button>
+      </div>
+      <div class="card">
+        <button class="btn btn-secondary" onclick="showHowToPlay()">📖 HOW TO PLAY</button>
       </div>
     </div>
 
+    <!-- 加入房间 -->
     <div id="join-page" class="page hidden">
-      <div class="header"><h1>加入房间</h1></div>
+      <div class="header"><h1>JOIN ROOM</h1></div>
       <div class="card">
-        <input type="text" id="join-name" class="input" placeholder="你的名字">
-        <input type="text" id="join-code" class="input" placeholder="房间号" maxlength="4">
-        <button class="btn btn-primary" onclick="joinRoom()">🚀 加入</button>
-        <button class="btn btn-secondary" onclick="showPage('home-page')">← 返回</button>
+        <input type="text" id="join-name" class="input" placeholder="Your name">
+        <input type="text" id="join-code" class="input" placeholder="Room code (e.g., ABCD)" maxlength="4">
+        <button class="btn btn-primary" onclick="joinRoom()">🚀 JOIN</button>
+        <button class="btn btn-secondary" onclick="showPage('home-page')">← BACK</button>
       </div>
+      <div id="join-error" class="error hidden"></div>
     </div>
 
+    <!-- 房间等待 -->
     <div id="room-page" class="page hidden">
-      <div class="header"><h1>房间</h1></div>
+      <div class="header"><h1>ROOM</h1></div>
       <div class="card">
-        <p style="color:#9ca3af;text-align:center">房间号</p>
+        <p style="color:#9ca3af;text-align:center">Room Code</p>
         <div class="room-code" id="display-room-code">----</div>
-        <div id="room-players"></div>
+        <div class="qr-section">
+          <p style="color:#9ca3af;font-size:12px">Share with friends</p>
+          <div class="share-text" id="share-text">Room: ----</div>
+          <button class="btn btn-secondary" onclick="copyRoomCode()">📋 COPY ROOM CODE</button>
+        </div>
+        <p class="status" id="room-status">Waiting for players...</p>
+        <div id="room-players" class="player-list"></div>
       </div>
-      <div class="card">
-        <button class="btn btn-primary" onclick="startGame()" id="start-btn">🎮 开始游戏</button>
-        <button class="btn btn-secondary" onclick="showPage('home-page')">🏠 返回</button>
+      <div class="card" id="host-controls">
+        <button class="btn btn-primary" onclick="startGame()" id="start-btn" disabled>🎮 START GAME (Need 3+ players)</button>
+        <button class="btn btn-secondary" onclick="leaveRoom()">🏠 LEAVE ROOM</button>
       </div>
     </div>
 
+    <!-- 游戏页面 -->
     <div id="game-page" class="page hidden">
-      <div class="header"><h1>你的词语</h1></div>
+      <div class="header"><h1>YOUR WORD</h1></div>
       <div class="card">
         <div class="word-display">
-          <p style="color:#e879f9;font-size:18px" id="game-role">---</p>
+          <p style="color:#e879f9;font-size:18px" id="game-role">CIVILIAN</p>
           <h2 id="game-word">---</h2>
+          <p style="color:#9ca3af;margin-top:20px;font-size:14px">Remember your word and describe it!</p>
         </div>
       </div>
       <div class="card" id="judge-panel" style="display:none">
-        <h3 style="color:#22d3ee">👨‍⚖️ 法官面板</h3>
+        <h3 style="color:#22d3ee;margin-bottom:16px">👨‍⚖️ JUDGE PANEL - All Players' Words</h3>
         <div id="judge-players"></div>
       </div>
       <div class="card">
-        <button class="btn btn-primary" onclick="nextPlayer()">➡️ 下一个玩家</button>
-        <button class="btn btn-secondary" onclick="showPage('room-page')">← 返回</button>
+        <button class="btn btn-secondary" onclick="showPage('room-page')">← BACK TO ROOM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- How To Play Modal -->
+  <div id="how-to-play-modal" class="modal-overlay" onclick="closeHowToPlay(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>📖 HOW TO PLAY</h2>
+        <p>Game Rules & Instructions</p>
+      </div>
+      <div class="modal-body">
+        <h3>🎯 Game Overview</h3>
+        <p>"Who's the Spy?" is a fun word-guessing game where players try to identify the hidden spy among them!</p>
+        
+        <h3>👥 Roles</h3>
+        <ul>
+          <li><span class="role-icon">👨‍⚖️</span><strong>Judge:</strong> Knows all words, hosts the game</li>
+          <li><span class="role-icon">👥</span><strong>Civilians:</strong> Get the same word</li>
+          <li><span class="role-icon">🕵️</span><strong>Spy:</strong> Gets a different word, must hide identity</li>
+        </ul>
+        
+        <h3>🎮 How to Play</h3>
+        <ol>
+          <li><strong>Create Room:</strong> One player creates a room and gets a 4-digit room code</li>
+          <li><strong>Join:</strong> Other players enter the room code to join</li>
+          <li><strong>Start:</strong> Judge clicks "Start Game" (needs 3+ players)</li>
+          <li><strong>Get Words:</strong> Everyone secretly views their assigned word</li>
+          <li><strong>Describe:</strong> Take turns describing your word without saying it directly</li>
+          <li><strong>Vote:</strong> Discuss and vote on who you think is the spy!</li>
+        </ol>
+        
+        <h3>🏆 Winning</h3>
+        <ul>
+          <li><strong>Civilians win</strong> if they correctly identify the spy</li>
+          <li><strong>Spy wins</strong> if they fool the civilians and avoid detection</li>
+        </ul>
+        
+        <h3>💡 Tips</h3>
+        <ul>
+          <li>Be creative with your descriptions!</li>
+          <li>Pay attention to others' clues</li>
+          <li>Spy: Try to blend in while being vague</li>
+          <li>Civilians: Look for inconsistencies</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn" onclick="closeHowToPlay()">GOT IT!</button>
       </div>
     </div>
   </div>
 
   <script>
-    let gameData = { rooms: {}, currentRoom: null, currentPlayer: null, isHost: false, currentPlayerIndex: 0 };
+    // Meoo Cloud Config
+    const SUPABASE_URL = 'https://q4gno1xecrv5.meoo.host/sb-api';
+    const SUPABASE_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzgxMzM3NjM2LCJleHAiOjEzMjkxOTc3NjM2fQ._9Yh08IrLNV35-Vi92qDrjHcUpg0PCVZ3nO-us_xa9o';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentRoom = null;
+    let currentPlayer = null;
+    let isHost = false;
+    let subscription = null;
+
     const wordPairs = [
       { civilian: 'Apple/苹果', spy: 'Orange/橙子' },
       { civilian: 'Dog/狗', spy: 'Cat/猫' },
@@ -95,6 +273,13 @@
       { civilian: 'Pizza/披萨', spy: 'Burger/汉堡' },
       { civilian: 'Beach/海滩', spy: 'Pool/泳池' },
       { civilian: 'Phone/手机', spy: 'Computer/电脑' },
+      { civilian: 'Train/火车', spy: 'Bus/公交车' },
+      { civilian: 'Guitar/吉他', spy: 'Violin/小提琴' },
+      { civilian: 'Sun/太阳', spy: 'Moon/月亮' },
+      { civilian: 'Mountain/山', spy: 'Hill/丘陵' },
+      { civilian: 'River/河流', spy: 'Lake/湖泊' },
+      { civilian: 'Shirt/衬衫', spy: 'T-shirt/T恤' },
+      { civilian: 'Shoes/鞋子', spy: 'Boots/靴子' },
     ];
 
     function generateCode() {
@@ -104,72 +289,211 @@
       return code;
     }
 
-    function createRoom() {
-      const name = document.getElementById('player-name').value.trim();
-      if (!name) { alert('请输入名字'); return; }
-      const roomCode = generateCode();
-      const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
-      gameData.rooms[roomCode] = { players: [{ name, role: 'judge', word: 'ALL WORDS', isHost: true }], wordPair, status: 'waiting' };
-      gameData.currentRoom = roomCode; gameData.currentPlayer = name; gameData.isHost = true;
-      document.getElementById('display-room-code').textContent = roomCode;
-      updatePlayerList(); showPage('room-page');
+    // How To Play Modal Functions
+    function showHowToPlay() {
+      document.getElementById('how-to-play-modal').classList.add('active');
     }
 
-    function joinRoom() {
+    function closeHowToPlay(event) {
+      if (!event || event.target === document.getElementById('how-to-play-modal')) {
+        document.getElementById('how-to-play-modal').classList.remove('active');
+      }
+    }
+
+    async function createRoom() {
+      const name = document.getElementById('player-name').value.trim();
+      if (!name) { alert('Please enter your name'); return; }
+
+      const roomCode = generateCode();
+      const roomId = 'room_' + Date.now();
+      const wordPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+
+      try {
+        const { error: roomError } = await supabase.from('game_rooms').insert({
+          id: roomId,
+          room_code: roomCode,
+          status: 'waiting',
+          word_civilian: wordPair.civilian,
+          word_spy: wordPair.spy
+        });
+        if (roomError) throw roomError;
+
+        const { error: playerError } = await supabase.from('game_players').insert({
+          room_id: roomId,
+          player_name: name,
+          role: 'judge',
+          word: 'ALL WORDS'
+        });
+        if (playerError) throw playerError;
+
+        currentRoom = { id: roomId, code: roomCode, wordPair };
+        currentPlayer = { name, role: 'judge' };
+        isHost = true;
+
+        document.getElementById('display-room-code').textContent = roomCode;
+        document.getElementById('share-text').textContent = 'Room: ' + roomCode + ' - Who\'s the Spy?';
+        showPage('room-page');
+        subscribeToRoom(roomId);
+      } catch (e) {
+        alert('Failed to create room: ' + e.message);
+      }
+    }
+
+    async function joinRoom() {
       const name = document.getElementById('join-name').value.trim();
       const code = document.getElementById('join-code').value.trim().toUpperCase();
-      if (!name || !code) { alert('请填写完整信息'); return; }
-      const room = gameData.rooms[code];
-      if (!room) { alert('房间不存在'); return; }
-      if (room.players.length >= 8) { alert('房间已满'); return; }
-      room.players.push({ name, role: null, word: null, isHost: false });
-      gameData.currentRoom = code; gameData.currentPlayer = name; gameData.isHost = false;
-      document.getElementById('display-room-code').textContent = code;
-      updatePlayerList(); showPage('room-page');
-    }
+      const errorDiv = document.getElementById('join-error');
 
-    function updatePlayerList() {
-      const room = gameData.rooms[gameData.currentRoom];
-      if (!room) return;
-      document.getElementById('room-players').innerHTML = room.players.map(p => 
-        `<div class="player-item"><span>${p.name}</span><span style="color:${p.role==='judge'?'#22d3ee':p.role==='spy'?'#e879f9':'#9ca3af'}">${p.role?p.role.toUpperCase():'WAITING'}</span></div>`
-      ).join('');
-    }
+      if (!name || !code) { errorDiv.textContent = 'Please fill in all fields'; errorDiv.classList.remove('hidden'); return; }
 
-    function startGame() {
-      const room = gameData.rooms[gameData.currentRoom];
-      if (!room || room.players.length < 3) { alert('需要至少3人'); return; }
-      const nonJudge = room.players.filter(p => !p.isHost);
-      const spyIndex = Math.floor(Math.random() * nonJudge.length);
-      nonJudge.forEach((p, i) => { p.role = i === spyIndex ? 'spy' : 'civilian'; p.word = i === spyIndex ? room.wordPair.spy : room.wordPair.civilian; });
-      room.status = 'playing'; gameData.currentPlayerIndex = 0; showGamePage();
-    }
+      try {
+        const { data: rooms, error: roomError } = await supabase.from('game_rooms').select('*').eq('room_code', code);
+        if (roomError) throw roomError;
+        if (!rooms || rooms.length === 0) { errorDiv.textContent = 'Room not found'; errorDiv.classList.remove('hidden'); return; }
 
-    function showGamePage() {
-      const room = gameData.rooms[gameData.currentRoom];
-      const me = room.players[gameData.currentPlayerIndex];
-      document.getElementById('game-role').textContent = me.role.toUpperCase();
-      document.getElementById('game-role').style.color = me.role === 'judge' ? '#22d3ee' : me.role === 'spy' ? '#e879f9' : '#a855f7';
-      document.getElementById('game-word').textContent = me.word;
-      document.getElementById('judge-panel').style.display = me.role === 'judge' ? 'block' : 'none';
-      if (me.role === 'judge') {
-        document.getElementById('judge-players').innerHTML = room.players.map(p => 
-          `<div class="player-item"><span>${p.name}</span><span style="color:#9ca3af">${p.word}</span></div>`
-        ).join('');
+        const room = rooms[0];
+        if (room.status !== 'waiting') { errorDiv.textContent = 'Game already started'; errorDiv.classList.remove('hidden'); return; }
+
+        const { data: players, error: countError } = await supabase.from('game_players').select('*').eq('room_id', room.id);
+        if (countError) throw countError;
+        if (players && players.length >= 8) { errorDiv.textContent = 'Room is full'; errorDiv.classList.remove('hidden'); return; }
+        if (players.find(p => p.player_name === name)) { errorDiv.textContent = 'Name already taken'; errorDiv.classList.remove('hidden'); return; }
+
+        const { error: joinError } = await supabase.from('game_players').insert({
+          room_id: room.id,
+          player_name: name,
+          role: null,
+          word: null
+        });
+        if (joinError) throw joinError;
+
+        currentRoom = { id: room.id, code: code, wordPair: { civilian: room.word_civilian, spy: room.word_spy } };
+        currentPlayer = { name, role: null };
+        isHost = false;
+
+        document.getElementById('display-room-code').textContent = code;
+        document.getElementById('share-text').textContent = 'Room: ' + code + ' - Who\'s the Spy?';
+        errorDiv.classList.add('hidden');
+        showPage('room-page');
+        subscribeToRoom(room.id);
+      } catch (e) {
+        errorDiv.textContent = 'Failed to join: ' + e.message;
+        errorDiv.classList.remove('hidden');
       }
-      showPage('game-page');
     }
 
-    function nextPlayer() {
-      const room = gameData.rooms[gameData.currentRoom];
-      gameData.currentPlayerIndex = (gameData.currentPlayerIndex + 1) % room.players.length;
-      const nextP = room.players[gameData.currentPlayerIndex];
-      alert(`请把设备交给: ${nextP.name}`);
+    function subscribeToRoom(roomId) {
+      if (subscription) subscription.unsubscribe();
+
+      subscription = supabase
+        .channel('room_' + roomId)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: 'room_id=eq.' + roomId }, () => {
+          updatePlayerList(roomId);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: 'id=eq.' + roomId }, (payload) => {
+          if (payload.new.status === 'playing') showGamePage();
+        })
+        .subscribe();
+
+      updatePlayerList(roomId);
+    }
+
+    async function updatePlayerList(roomId) {
+      const { data: players, error } = await supabase.from('game_players').select('*').eq('room_id', roomId);
+      if (error || !players) return;
+
+      const list = document.getElementById('room-players');
+      list.innerHTML = players.map(p => {
+        let badgeClass = 'badge-waiting', roleText = 'Waiting';
+        if (p.role === 'judge') { badgeClass = 'badge-judge'; roleText = 'Judge'; }
+        else if (p.role === 'civilian') { badgeClass = 'badge-civilian'; roleText = 'Civilian'; }
+        else if (p.role === 'spy') { badgeClass = 'badge-spy'; roleText = 'Spy'; }
+        return '<div class="player-item"><span>' + p.player_name + '</span><span class="badge ' + badgeClass + '">' + roleText + '</span></div>';
+      }).join('');
+
+      document.getElementById('room-status').textContent = players.length + ' players in room';
+
+      if (isHost) {
+        const startBtn = document.getElementById('start-btn');
+        startBtn.disabled = players.length < 3;
+        startBtn.textContent = players.length < 3 ? 'START GAME (Need ' + (3-players.length) + ' more)' : '🎮 START GAME';
+      }
+    }
+
+    async function startGame() {
+      if (!isHost || !currentRoom) return;
+
+      const { data: players, error } = await supabase.from('game_players').select('*').eq('room_id', currentRoom.id);
+      if (error || !players || players.length < 3) { alert('Need at least 3 players'); return; }
+
+      const nonJudge = players.filter(p => p.role !== 'judge');
+      const spyIndex = Math.floor(Math.random() * nonJudge.length);
+
+      for (let i = 0; i < nonJudge.length; i++) {
+        const isSpy = i === spyIndex;
+        await supabase.from('game_players').update({
+          role: isSpy ? 'spy' : 'civilian',
+          word: isSpy ? currentRoom.wordPair.spy : currentRoom.wordPair.civilian
+        }).eq('id', nonJudge[i].id);
+      }
+
+      await supabase.from('game_rooms').update({ status: 'playing' }).eq('id', currentRoom.id);
       showGamePage();
     }
 
-    function showJoin() { document.getElementById('join-name').value = document.getElementById('player-name').value.trim(); showPage('join-page'); }
-    function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+    async function showGamePage() {
+      if (!currentRoom) return;
+
+      const { data: players, error } = await supabase.from('game_players').select('*').eq('room_id', currentRoom.id);
+      if (error || !players) return;
+
+      const me = players.find(p => p.player_name === currentPlayer.name);
+      if (me) {
+        currentPlayer.role = me.role;
+        document.getElementById('game-role').textContent = me.role === 'judge' ? 'JUDGE' : me.role === 'spy' ? 'SPY' : 'CIVILIAN';
+        document.getElementById('game-role').style.color = me.role === 'judge' ? '#22d3ee' : me.role === 'spy' ? '#e879f9' : '#a855f7';
+        document.getElementById('game-word').textContent = me.word || '---';
+
+        if (me.role === 'judge') {
+          document.getElementById('judge-panel').style.display = 'block';
+          document.getElementById('judge-players').innerHTML = players.map(p =>
+            '<div class="player-item"><span>' + p.player_name + '</span><span style="color:#9ca3af">' + p.word + '</span></div>'
+          ).join('');
+        } else {
+          document.getElementById('judge-panel').style.display = 'none';
+        }
+      }
+
+      showPage('game-page');
+    }
+
+    async function leaveRoom() {
+      if (subscription) subscription.unsubscribe();
+      if (currentRoom && !isHost) {
+        await supabase.from('game_players').delete().eq('room_id', currentRoom.id).eq('player_name', currentPlayer.name);
+      }
+      currentRoom = null;
+      currentPlayer = null;
+      isHost = false;
+      showPage('home-page');
+    }
+
+    function copyRoomCode() {
+      const code = currentRoom?.code;
+      if (code) {
+        navigator.clipboard.writeText('Room: ' + code + ' - Who\'s the Spy?').then(() => alert('Room code copied!'));
+      }
+    }
+
+    function showJoin() {
+      document.getElementById('join-name').value = document.getElementById('player-name').value.trim();
+      showPage('join-page');
+    }
+
+    function showPage(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+    }
   </script>
 </body>
 </html>
